@@ -135,7 +135,21 @@ def playfair_transform(text: str, raw_key: str, encrypt: bool) -> str:
     if not letters:
         return text
 
-    processed = _playfair_process_pairs(letters, matrix, encrypt=encrypt)
+    # При шифровании, если пара букв совпадает, логически вставляем X между ними
+    if encrypt:
+        prepared_letters = []
+        i = 0
+        while i < len(letters):
+            prepared_letters.append(letters[i])
+            if i + 1 < len(letters) and letters[i] == letters[i + 1]:
+                prepared_letters.append("X")
+                i += 1
+            else:
+                i += 1
+    else:
+        prepared_letters = letters
+
+    processed = _playfair_process_pairs(prepared_letters, matrix, encrypt=encrypt)
 
     # Заменяем только буквы, остальные символы остаются на местах
     result_chars = chars[:]
