@@ -75,6 +75,12 @@ def _find_in_matrix(matrix, ch: str):
     return -1, -1
 
 
+def _is_en_letter(ch: str) -> bool:
+    """Проверка, является ли символ английской буквой A-Z."""
+    c = ch.upper()
+    return "A" <= c <= "Z"
+
+
 def _playfair_process_pairs(letters: list, matrix, encrypt: bool) -> str:
     """Обрабатывает список букв парами (без вставки X между одинаковыми)."""
     result = []
@@ -109,68 +115,140 @@ def playfair_transform(text: str, raw_key: str, encrypt: bool) -> str:
     """
     Применяет шифр Плейфейра к английскому тексту.
     - Ключ логически очищается (только A-Z, J->I).
-    - Недопустимые символы в ключе и тексте игнорируются при шифровании,
-      но визуально остаются на своих местах.
+    - Недопустимые символы текста не шифруются и остаются на своих местах.
     - Если очищенный ключ пуст, текст возвращается без изменений.
     """
     clean_key = _clean_key_playfair(raw_key)
-    if not clean_key:
-        return text
-
+    # Если после очистки ключ пустой, матрица строится просто по алфавиту.
     matrix = _build_playfair_matrix(clean_key)
 
-    # Собираем только английские буквы (J -> I), запоминаем их позиции
-    chars = list(text)
-    letter_positions = []
+    # Разбиваем текст на слова (английские буквы) и разделители,
+    # одновременно формируя глобальный список букв и их принадлежность словам.
+    words = []
+    seps = []  # seps[i] — разделитель ПЕРЕД words[i] (seps[0] — префикс), seps[len(words)] — суффикс
     letters = []
-    for idx, ch in enumerate(chars):
-        if ch.isalpha():
+    letter_word_idx = []
+
+    n = len(text)
+    i = 0
+
+    # начальный разделитель до первого слова
+    sep_chars = []
+    while i < n and not _is_en_letter(text[i]):
+        sep_chars.append(text[i])
+        i += 1
+    seps.append("".join(sep_chars))
+
+    while i < n:
+        # слово из английских букв
+        word_index = len(words)
+        word_chars = []
+        while i < n and _is_en_letter(text[i]):
+            ch = text[i]
+            word_chars.append(ch)
             c = ch.upper()
-            if "A" <= c <= "Z":
-                if c == "J":
-                    c = "I"
-                letter_positions.append(idx)
-                letters.append(c)
+            if c == "J":
+                c = "I"
+            letters.append(c)
+            letter_word_idx.append(word_index)
+            i += 1
+        words.append("".join(word_chars))
+
+        # разделитель после слова
+        sep_chars = []
+        while i < n and not _is_en_letter(text[i]):
+            sep_chars.append(text[i])
+            i += 1
+        seps.append("".join(sep_chars))
 
     if not letters:
         return text
 
-    # При шифровании, если пара букв совпадает, логически вставляем X между ними
+    # Строим подготовленную последовательность букв с учётом вставки X
+    # (по всей строке, без обнуления на границах слов),
+    # одновременно отслеживая, к какому слову относится каждая буква.
     if encrypt:
         prepared_letters = []
-        i = 0
-        while i < len(letters):
-            prepared_letters.append(letters[i])
-            if i + 1 < len(letters) and letters[i] == letters[i + 1]:
-                prepared_letters.append("X")
-                i += 1
+        prepared_word_idx = []
+        j = 0
+        L = len(letters)
+        while j < L:
+            first = letters[j]
+            w_first = letter_word_idx[j]
+            if j + 1 < L:
+                second = letters[j + 1]
+                w_second = letter_word_idx[j + 1]
+                if first == second:
+                    # пара одинаковых букв: вставляем X, относя X к первому слову
+                    prepared_letters.append(first)
+                    prepared_word_idx.append(w_first)
+                    prepared_letters.append("X")
+                    prepared_word_idx.append(w_first)
+                    j += 1
+                else:
+                    prepared_letters.append(first)
+                    prepared_word_idx.append(w_first)
+                    prepared_letters.append(second)
+                    prepared_word_idx.append(w_second)
+                    j += 2
             else:
-                i += 1
+                # последняя одинокая буква — дополняем X
+                prepared_letters.append(first)
+                prepared_word_idx.append(w_first)
+                prepared_letters.append("X")
+                prepared_word_idx.append(w_first)
+                j += 1
     else:
-        prepared_letters = letters
+        prepared_letters = letters[:]
+        prepared_word_idx = letter_word_idx[:]
 
     processed = _playfair_process_pairs(prepared_letters, matrix, encrypt=encrypt)
 
-    # Заменяем только буквы, остальные символы остаются на местах
-    result_chars = chars[:]
-    k = 0
-    for pos in letter_positions:
-        if k >= len(processed):
-            break
-        orig = result_chars[pos]
-        new_ch = processed[k]
-        # сохраняем регистр
-        if orig.islower():
-            new_ch = new_ch.lower()
-        result_chars[pos] = new_ch
-        k += 1
+    # Распределяем зашифрованные буквы по словам
+    word_cipher = [[] for _ in range(len(words))]
+    for ch, widx in zip(processed, prepared_word_idx):
+        if 0 <= widx < len(word_cipher):
+            word_cipher[widx].append(ch)
 
-    # если возник лишний символ (при нечётном числе букв) — добавим его в конец
-    if k < len(processed):
-        extra = processed[k:]
-        result_chars.extend(extra)
+    # Собираем финальный результат: разделители + зашифрованные слова
+    result_parts = []
 
-    return "".join(result_chars)
+    # префиксный разделитель
+    if seps:
+        result_parts.append(seps[0])
+
+    for idx, orig_word in enumerate(words):
+        cipher_letters = word_cipher[idx]
+        ci = 0
+        result_word_chars = []
+
+        # заменяем буквы в слове зашифрованными, сохраняя регистр;
+        # если зашифрованных букв больше (из-за X), лишние добавляем в конец слова
+        for ch in orig_word:
+            if ci < len(cipher_letters):
+                new_c = cipher_letters[ci]
+                ci += 1
+                if ch.islower():
+                    new_c = new_c.lower()
+                result_word_chars.append(new_c)
+            else:
+                result_word_chars.append(ch)
+
+        if ci < len(cipher_letters):
+            extra = cipher_letters[ci:]
+            result_word_chars.extend(extra)
+
+        result_parts.append("".join(result_word_chars))
+
+        # разделитель после слова
+        if idx + 1 < len(seps):
+            result_parts.append(seps[idx + 1])
+
+    # если есть лишние разделители (быть не должно, но на всякий случай)
+    if len(seps) > len(words) + 1:
+        result_parts.extend(seps[len(words) + 1 :])
+
+    return "".join(result_parts)
 
 
 def playfair_encrypt(text: str, raw_key: str) -> str:
