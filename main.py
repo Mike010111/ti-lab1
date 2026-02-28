@@ -1,24 +1,15 @@
-# -*- coding: utf-8 -*-
-"""
-Лабораторная работа по теории информации.
-Шифрование и дешифрование текста: Плейфейр (англ.) и Виженер (рус.) с прогрессивным ключом.
-GUI на tkinter.
-"""
-
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 
 
-# === Константы алфавитов ===
-
+# Константы алфавитов
 EN_ALPHABET_PLAYFAIR = "ABCDEFGHIKLMNOPQRSTUVWXYZ"  # J объединяем с I
-RU_ALPHABET = "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
+RU_ALPHABET = "АБВГДЕËЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
 
 
-# === Вспомогательные функции для ключей ===
-
+# Вспомогательные функции для ключей
 def _clean_key_playfair(raw_key: str) -> str:
-    """Очищает ключ для шифра Плейфейра: только буквы A-Z, J -> I, без повторов."""
+    # Очищает ключ для шифра Плейфейра: только буквы A-Z, J -> I, без повторов
     result = []
     seen = set()
     for ch in raw_key:
@@ -34,7 +25,7 @@ def _clean_key_playfair(raw_key: str) -> str:
 
 
 def _clean_key_vigenere(raw_key: str) -> str:
-    """Очищает ключ для Виженера: только буквы русского алфавита."""
+    # Очищает ключ для Виженера: только буквы русского алфавита
     result = []
     for ch in raw_key:
         c = ch.upper()
@@ -43,10 +34,10 @@ def _clean_key_vigenere(raw_key: str) -> str:
     return "".join(result)
 
 
-# === Шифр Плейфейра (английский) ===
+# Шифр Плейфейра (английский язык)
 
 def _build_playfair_matrix(clean_key: str):
-    """Строит матрицу 5x5 из очищенного ключа."""
+    # Строит матрицу 5x5 из очищенного ключа
     used = set(clean_key)
     matrix = []
     row = []
@@ -76,13 +67,11 @@ def _find_in_matrix(matrix, ch: str):
 
 
 def _is_en_letter(ch: str) -> bool:
-    """Проверка, является ли символ английской буквой A-Z."""
     c = ch.upper()
     return "A" <= c <= "Z"
 
 
 def _playfair_process_pairs(letters: list, matrix, encrypt: bool) -> str:
-    """Обрабатывает список букв парами (без вставки X между одинаковыми)."""
     result = []
     i = 0
     # если нечётное количество букв, добавим X в конец
@@ -112,27 +101,18 @@ def _playfair_process_pairs(letters: list, matrix, encrypt: bool) -> str:
 
 
 def playfair_transform(text: str, raw_key: str, encrypt: bool) -> str:
-    """
-    Применяет шифр Плейфейра к английскому тексту.
-    - Ключ логически очищается (только A-Z, J->I).
-    - Недопустимые символы текста не шифруются и остаются на своих местах.
-    - Если очищенный ключ пуст, текст возвращается без изменений.
-    """
     clean_key = _clean_key_playfair(raw_key)
-    # Если после очистки ключ пустой, матрица строится просто по алфавиту.
     matrix = _build_playfair_matrix(clean_key)
 
     # Разбиваем текст на слова (английские буквы) и разделители,
     # одновременно формируя глобальный список букв и их принадлежность словам.
     words = []
-    seps = []  # seps[i] — разделитель ПЕРЕД words[i] (seps[0] — префикс), seps[len(words)] — суффикс
+    seps = []
     letters = []
     letter_word_idx = []
-
     n = len(text)
     i = 0
 
-    # начальный разделитель до первого слова
     sep_chars = []
     while i < n and not _is_en_letter(text[i]):
         sep_chars.append(text[i])
@@ -140,7 +120,6 @@ def playfair_transform(text: str, raw_key: str, encrypt: bool) -> str:
     seps.append("".join(sep_chars))
 
     while i < n:
-        # слово из английских букв
         word_index = len(words)
         word_chars = []
         while i < n and _is_en_letter(text[i]):
@@ -154,7 +133,6 @@ def playfair_transform(text: str, raw_key: str, encrypt: bool) -> str:
             i += 1
         words.append("".join(word_chars))
 
-        # разделитель после слова
         sep_chars = []
         while i < n and not _is_en_letter(text[i]):
             sep_chars.append(text[i])
@@ -164,9 +142,6 @@ def playfair_transform(text: str, raw_key: str, encrypt: bool) -> str:
     if not letters:
         return text
 
-    # Строим подготовленную последовательность букв с учётом вставки X
-    # (по всей строке, без обнуления на границах слов),
-    # одновременно отслеживая, к какому слову относится каждая буква.
     if encrypt:
         prepared_letters = []
         prepared_word_idx = []
@@ -192,7 +167,7 @@ def playfair_transform(text: str, raw_key: str, encrypt: bool) -> str:
                     prepared_word_idx.append(w_second)
                     j += 2
             else:
-                # последняя одинокая буква — дополняем X
+                # последняя одиночная буква — дополняем X
                 prepared_letters.append(first)
                 prepared_word_idx.append(w_first)
                 prepared_letters.append("X")
@@ -210,10 +185,7 @@ def playfair_transform(text: str, raw_key: str, encrypt: bool) -> str:
         if 0 <= widx < len(word_cipher):
             word_cipher[widx].append(ch)
 
-    # Собираем финальный результат: разделители + зашифрованные слова
     result_parts = []
-
-    # префиксный разделитель
     if seps:
         result_parts.append(seps[0])
 
@@ -221,15 +193,10 @@ def playfair_transform(text: str, raw_key: str, encrypt: bool) -> str:
         cipher_letters = word_cipher[idx]
         ci = 0
         result_word_chars = []
-
-        # заменяем буквы в слове зашифрованными, сохраняя регистр;
-        # если зашифрованных букв больше (из-за X), лишние добавляем в конец слова
         for ch in orig_word:
             if ci < len(cipher_letters):
                 new_c = cipher_letters[ci]
                 ci += 1
-                if ch.islower():
-                    new_c = new_c.lower()
                 result_word_chars.append(new_c)
             else:
                 result_word_chars.append(ch)
@@ -240,14 +207,11 @@ def playfair_transform(text: str, raw_key: str, encrypt: bool) -> str:
 
         result_parts.append("".join(result_word_chars))
 
-        # разделитель после слова
         if idx + 1 < len(seps):
             result_parts.append(seps[idx + 1])
 
-    # если есть лишние разделители (быть не должно, но на всякий случай)
     if len(seps) > len(words) + 1:
         result_parts.extend(seps[len(words) + 1 :])
-
     return "".join(result_parts)
 
 
@@ -259,21 +223,13 @@ def playfair_decrypt(text: str, raw_key: str) -> str:
     return playfair_transform(text, raw_key, encrypt=False)
 
 
-# === Виженер с прогрессивным ключом (русский) ===
-
+# Виженер с прогрессивным ключом (для русского языка)
 def _shift_ru_char(ch: str, shift: int) -> str:
     idx = RU_ALPHABET.index(ch)
     return RU_ALPHABET[(idx + shift) % len(RU_ALPHABET)]
 
 
 def vigenere_progressive_encrypt(text: str, raw_key: str) -> str:
-    """
-    Шифр Виженера с прогрессивным ключом (русский текст).
-    - очищаем ключ до русских букв;
-    - недопустимые символы в ключе логически отбрасываются;
-    - недопустимые символы в тексте не шифруются и остаются на своих местах;
-    - при каждом полном проходе ключа все его символы сдвигаются в алфавите на 1.
-    """
     clean_key = _clean_key_vigenere(raw_key)
     if not clean_key:
         return text
@@ -290,8 +246,6 @@ def vigenere_progressive_encrypt(text: str, raw_key: str) -> str:
             k = RU_ALPHABET.index(effective_key_char)
             p = RU_ALPHABET.index(upper)
             c = RU_ALPHABET[(p + k) % len(RU_ALPHABET)]
-            if ch.islower():
-                c = c.lower()
             res.append(c)
             letter_index += 1
         else:
@@ -300,7 +254,7 @@ def vigenere_progressive_encrypt(text: str, raw_key: str) -> str:
 
 
 def vigenere_progressive_decrypt(text: str, raw_key: str) -> str:
-    """Обратное преобразование для прогрессивного шифра Виженера."""
+    # Обратное преобразование для прогрессивного шифра Виженера
     clean_key = _clean_key_vigenere(raw_key)
     if not clean_key:
         return text
@@ -317,8 +271,6 @@ def vigenere_progressive_decrypt(text: str, raw_key: str) -> str:
             k = RU_ALPHABET.index(effective_key_char)
             c = RU_ALPHABET.index(upper)
             p = RU_ALPHABET[(c - k) % len(RU_ALPHABET)]
-            if ch.islower():
-                p = p.lower()
             res.append(p)
             letter_index += 1
         else:
@@ -336,11 +288,9 @@ class CipherApp:
         self._build_ui()
 
     def _build_ui(self):
-        # Основной контейнер
         main_frame = ttk.Frame(self.root, padding=10)
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # === Выбор алгоритма ===
         algo_frame = ttk.LabelFrame(main_frame, text="Алгоритм шифрования", padding=5)
         algo_frame.pack(fill=tk.X, pady=(0, 5))
         self.algo_var = tk.StringVar(value="playfair")
@@ -357,13 +307,11 @@ class CipherApp:
             value="vigenere",
         ).pack(anchor=tk.W)
 
-        # === Ключ ===
         key_frame = ttk.LabelFrame(main_frame, text="Ключ", padding=5)
         key_frame.pack(fill=tk.X, pady=(0, 5))
         self.key_entry = ttk.Entry(key_frame, width=60)
         self.key_entry.pack(fill=tk.X, pady=2)
 
-        # === Исходный текст ===
         input_frame = ttk.LabelFrame(main_frame, text="Исходный текст (ввод / загрузка из файла)", padding=5)
         input_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
         self.input_text = scrolledtext.ScrolledText(input_frame, height=8, wrap=tk.WORD, font=("Consolas", 11))
@@ -373,14 +321,12 @@ class CipherApp:
         btn_input.pack(fill=tk.X, pady=(5, 0))
         ttk.Button(btn_input, text="Загрузить из файла...", command=self._load_file).pack(side=tk.LEFT, padx=(0, 5))
 
-        # === Действия ===
         action_frame = ttk.LabelFrame(main_frame, text="Действия", padding=10)
         action_frame.pack(fill=tk.X, pady=10)
         ttk.Button(action_frame, text="Шифровать", command=self._encrypt).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Button(action_frame, text="Дешифровать", command=self._decrypt).pack(side=tk.LEFT, padx=(0, 8))
         ttk.Button(action_frame, text="Очистить", command=self._clear).pack(side=tk.LEFT, padx=(0, 8))
 
-        # === Результат ===
         output_frame = ttk.LabelFrame(main_frame, text="Результат", padding=5)
         output_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 5))
         self.output_text = scrolledtext.ScrolledText(output_frame, height=8, wrap=tk.WORD, font=("Consolas", 11))
@@ -406,7 +352,6 @@ class CipherApp:
         if not text:
             messagebox.showwarning("Внимание", "Введите текст для шифрования.")
             return
-        # Ключ может оказаться пустым после логической очистки, тогда просто возвращаем текст
         if self.algo_var.get() == "playfair":
             result = playfair_encrypt(text, key)
         else:
